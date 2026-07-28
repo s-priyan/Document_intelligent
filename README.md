@@ -55,7 +55,7 @@ App: `http://localhost:3000`. The backend allows CORS from `:3000` (and `:3001`)
 
 ## b. Architecture overview
 
-[system overview](https://github.com/s-priyan/Document_intelligent/blob/main/system-overview.png)
+![system overview](https://github.com/s-priyan/Document_intelligent/blob/main/system-overview.png)
 
 ---
 
