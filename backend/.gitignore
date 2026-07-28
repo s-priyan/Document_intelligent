@@ -1,0 +1,11 @@
+# Uploaded materials and generated artifacts
+storage/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment
+.env
