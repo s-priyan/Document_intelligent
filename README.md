@@ -101,14 +101,14 @@ and build citations.
 
 | Component         | Options considered                                  | Final choice                                  | Why                                                                                  |
 | ----------------- | --------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **LLM**           | OpenAI GPT, Anthropic Claude, local (Llama)         | **OpenAI GPT** (`openai_model`, configurable) | Strong grounded-QA quality, simple API, easy to swap via config                      |
+| **LLM**           | OpenAI GPT, Anthropic Claude        | **OpenAI GPT** (`openai_model`, configurable) | Strong grounded-QA quality, simple API, easy to swap via config                      |
 | **Embeddings**    | OpenAI `text-embedding-3`, `BAAI/bge-small-en-v1.5` | `bge-small-en-v1.5` (HuggingFace open source) | Strong quality-for-size, runs locally, no per-embedding API cost/keys                |
 | **Vector DB**     | FAISS, Chroma, pgvector                             | **Chroma** (on-disk, per-index collection)    | Zero-infra persistence, simple isolation per index; clean upgrade path to pgvector   |
 | **Orchestration** | Raw calls, LangChain chains, **LangGraph**          | **LangGraph**                                 | Explicit stateful graph + checkpointer gives clean multi-turn memory per `thread_id` |
 | **Parser**        | PyPDF/textract, **Docling**                         | **Docling**                                   | Preserves structure (headings/tables) as markdown → better chunks & citations        |
 
 
-- **Chunking:** `RecursiveCharacterTextSplitter`, size **1000** / overlap **150**, with
+- **Chunking:** `RecursiveCharacterTextSplitter`, size **5000** / overlap **150**, with
 `add_start_index` so each chunk keeps its character offset (used for citations).
 - **Context management:** retrieved chunks are injected fresh into a *system* message each
 turn; only human/assistant turns are persisted in history (retrieved context is not),
