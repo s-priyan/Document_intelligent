@@ -76,7 +76,7 @@ in-memory sessions, synchronous ingestion). To productionize:
 | **Streaming**          | Full-response JSON                  | SSE/WebSocket token streaming from the LLM                                                                                                     |
 | **Observability**      | Standard logging                    | CloudWatch logs/metrics, LLM tracing (LangSmith)                                                                                               |
 | **Access control**     | None (v1)                           | Cognito auth + RBAC; per-user/tenant index isolation                                                                                           |
-| **Delivery**           | `next dev`                          | Frontend on Vercel or S3+CloudFront; CI/CD via GitHub Actions + IaC (CDK/Terraform)                                                            |
+| **Delivery**           | `next dev`                          | Frontend on Vercel or S3+CloudFront; CI/CD via GitHub Actions                                                          |
 
 
 Target flow (event-driven ingestion):
