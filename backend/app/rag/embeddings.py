@@ -1,7 +1,8 @@
 """HuggingFace embedding model provider (FR-5).
 
-The model is loaded lazily and cached process-wide because loading
-sentence-transformer weights is expensive and only needed at ingestion time.
+Loading sentence-transformer weights is expensive, so the model is cached
+process-wide and normally constructed once during application startup
+(see ``app.main.lifespan``), falling back to first use if that is disabled.
 """
 
 from functools import lru_cache

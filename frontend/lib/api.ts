@@ -9,6 +9,7 @@
 import { API_BASE_URL } from "./config";
 import type {
   BulkUploadResponse,
+  Citation,
   KnowledgeIndex,
   QueryResponse,
 } from "./types";
@@ -115,4 +116,110 @@ export function queryKnowledgeIndex(
       body: JSON.stringify({ question, session_id: sessionId }),
     },
   );
+}
+
+/** Callbacks invoked as the streaming query endpoint publishes its events. */
+export interface QueryStreamHandlers {
+  onSession?: (sessionId: string) => void;
+  onCitations?: (citations: Citation[]) => void;
+  onDelta?: (text: string) => void;
+  onDone?: (answer: string) => void;
+}
+
+/**
+ * Ask a grounded question and consume the answer as server-sent events (FR-8).
+ *
+ * The browser `EventSource` API cannot issue a POST body, so the stream is read
+ * off `fetch` manually. Resolves once the terminal `done` event arrives; a
+ * transport failure, a non-2xx status or a terminal `error` event all surface as
+ * a thrown {@link ApiError}.
+ */
+export async function streamKnowledgeIndexQuery(
+  indexId: string,
+  question: string,
+  sessionId: string | null,
+  handlers: QueryStreamHandlers,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_BASE_URL}/knowledge-indexes/${encodeURIComponent(indexId)}/query/stream`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify({ question, session_id: sessionId }),
+      },
+    );
+  } catch {
+    throw new ApiError(
+      "Cannot reach the server. Check that the backend is running.",
+      0,
+    );
+  }
+
+  if (!response.ok || response.body === null) {
+    throw new ApiError(await extractErrorMessage(response), response.status);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split(/\r\n\r\n|\n\n/);
+    // The last element is an incomplete frame; keep it for the next chunk.
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      dispatchStreamFrame(frame, handlers);
+    }
+  }
+}
+
+/** Route one parsed SSE frame to its handler, ignoring keep-alives. */
+function dispatchStreamFrame(frame: string, handlers: QueryStreamHandlers): void {
+  let name = "message";
+  const dataLines: string[] = [];
+
+  for (const line of frame.split(/\r\n|\n/)) {
+    if (line.startsWith("event:")) {
+      name = line.slice("event:".length).trim();
+    } else if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trimStart());
+    }
+  }
+
+  if (dataLines.length === 0) {
+    return;
+    // Comment-only frames (server pings) carry no payload.
+  }
+
+  const payload = JSON.parse(dataLines.join("\n"));
+  switch (name) {
+    case "session":
+      handlers.onSession?.(payload.session_id as string);
+      return;
+    case "citations":
+      handlers.onCitations?.(payload.citations as Citation[]);
+      return;
+    case "delta":
+      handlers.onDelta?.(payload.text as string);
+      return;
+    case "done":
+      handlers.onDone?.(payload.answer as string);
+      return;
+    case "error":
+      // An in-band failure has no HTTP status of its own; 0 matches the
+      // convention used for transport errors above.
+      throw new ApiError(payload.detail as string, 0);
+    default:
+      return;
+  }
 }

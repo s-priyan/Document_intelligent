@@ -7,11 +7,12 @@ import { SendIcon, SpinnerIcon } from "@/components/ui/Icons";
 interface ChatInputBarProps {
   onSend: (question: string) => void;
   disabled?: boolean;
+  initialValue?: string;
 }
 
 /** Auto-growing chat composer; Enter sends, Shift+Enter inserts a newline (FR-14). */
-export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
-  const [value, setValue] = useState("");
+export function ChatInputBar({ onSend, disabled, initialValue = "" }: ChatInputBarProps) {
+  const [value, setValue] = useState(initialValue);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const resize = useCallback(() => {

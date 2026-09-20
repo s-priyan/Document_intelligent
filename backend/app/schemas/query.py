@@ -1,5 +1,7 @@
 """Pydantic models for question answering over a knowledge index (FR-8 to FR-12)."""
 
+from typing import ClassVar
+
 from pydantic import BaseModel, Field
 
 
@@ -28,3 +30,53 @@ class QueryResponse(BaseModel):
     answer: str
     citations: list[Citation]
     session_id: str
+
+
+class QueryStreamEvent(BaseModel):
+    """Base class for the events emitted by the streaming query endpoint.
+
+    ``event`` is the SSE event name the payload is published under; the JSON
+    body of the frame is the serialised model itself.
+    """
+
+    event: ClassVar[str]
+
+
+class SessionEvent(QueryStreamEvent):
+    """Announces the session id for the turn; always the first event sent."""
+
+    event: ClassVar[str] = "session"
+
+    session_id: str
+
+
+class CitationsEvent(QueryStreamEvent):
+    """The sources the answer will be grounded in, sent before any text (FR-11)."""
+
+    event: ClassVar[str] = "citations"
+
+    citations: list[Citation]
+
+
+class DeltaEvent(QueryStreamEvent):
+    """An incremental piece of the answer as the model produces it."""
+
+    event: ClassVar[str] = "delta"
+
+    text: str
+
+
+class DoneEvent(QueryStreamEvent):
+    """Terminal success event carrying the concatenated answer."""
+
+    event: ClassVar[str] = "done"
+
+    answer: str
+
+
+class ErrorEvent(QueryStreamEvent):
+    """Terminal failure event; replaces :class:`DoneEvent` when a turn fails."""
+
+    event: ClassVar[str] = "error"
+
+    detail: str

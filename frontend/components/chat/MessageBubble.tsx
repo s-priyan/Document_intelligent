@@ -1,14 +1,16 @@
 import { AlertIcon, SparkleIcon } from "@/components/ui/Icons";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, Citation } from "@/lib/types";
+import { AnswerMarkdown } from "./AnswerMarkdown";
 import { CitationList } from "./CitationList";
 import { TypingIndicator } from "./TypingIndicator";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onCitation: (citations: Citation[], position: number) => void;
 }
 
 /** A single chat turn: right-aligned user bubble or left-aligned assistant answer (FR-14). */
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onCitation }: MessageBubbleProps) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end animate-fade-in-up">
@@ -32,19 +34,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </span>
 
       <div className="min-w-0 max-w-[85%] rounded-bubble rounded-tl-md border border-line bg-canvas-raised px-4 py-3 shadow-soft">
-        {message.pending ? (
+        {message.pending && message.content.length === 0 ? (
           <TypingIndicator />
         ) : (
           <>
-            <p
-              className={[
-                "whitespace-pre-wrap text-sm leading-relaxed",
-                message.error ? "text-danger" : "text-ink",
-              ].join(" ")}
-            >
-              {message.content}
-            </p>
-            {message.citations ? <CitationList citations={message.citations} /> : null}
+            {message.error ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-danger">
+                {message.content}
+              </p>
+            ) : (
+              <AnswerMarkdown content={message.content} />
+            )}
+            {!message.pending && message.citations ? (
+              <CitationList citations={message.citations} onSelect={onCitation} />
+            ) : null}
           </>
         )}
       </div>

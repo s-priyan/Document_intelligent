@@ -1,8 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Claude-inspired theme: warm cream canvas, terracotta accent, calm slate text,
- * soft rounded surfaces and a clean humanist sans-serif stack.
+ * Dark knowledge workspace with blue actions and muted slate surfaces.
  */
 const config: Config = {
   content: [
@@ -14,28 +13,28 @@ const config: Config = {
     extend: {
       colors: {
         canvas: {
-          DEFAULT: "#F0EEE6",
-          raised: "#F7F5EF",
-          sunken: "#E8E5DA",
+          DEFAULT: "#0B1223",
+          raised: "#080E1D",
+          sunken: "#151E33",
         },
         ink: {
-          DEFAULT: "#2E2C28",
-          soft: "#4A4741",
-          muted: "#6B6862",
-          faint: "#928F86",
+          DEFAULT: "#F3F6FC",
+          soft: "#CCD5E5",
+          muted: "#95A5BE",
+          faint: "#8B9AB2",
         },
         accent: {
-          DEFAULT: "#D97757",
-          hover: "#C8623F",
-          soft: "#EBC7B6",
-          faint: "#F4E4DB",
+          DEFAULT: "#2454FF",
+          hover: "#3D68FF",
+          soft: "#A5B8FF",
+          faint: "#101D43",
         },
         line: {
-          DEFAULT: "#DED9CC",
-          strong: "#C9C3B2",
+          DEFAULT: "#263044",
+          strong: "#43516A",
         },
-        success: "#4F7D5B",
-        danger: "#B4453A",
+        success: "#79DBA6",
+        danger: "#FF839A",
       },
       fontFamily: {
         sans: [

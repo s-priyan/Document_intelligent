@@ -1,0 +1,1 @@
+export const STARTER_QUESTIONS = ["Summarise these documents in 5 key points.", "What are the main topics covered in these documents?", "What important actions or recommendations do these documents describe?"];

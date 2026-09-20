@@ -2,13 +2,15 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 
 interface ChatPageProps {
   params: Promise<{ indexId: string }>;
+  searchParams: Promise<{ question?: string }>;
 }
 
-export default async function ChatPage({ params }: ChatPageProps) {
+export default async function ChatPage({ params, searchParams }: ChatPageProps) {
   const { indexId } = await params;
+  const { question } = await searchParams;
   return (
     <main className="min-h-dvh">
-      <ChatPanel indexId={decodeURIComponent(indexId)} />
+      <ChatPanel key={indexId} indexId={indexId} initialQuestion={question} />
     </main>
   );
 }

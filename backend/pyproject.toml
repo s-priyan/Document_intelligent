@@ -17,6 +17,7 @@ dependencies = [
     "langgraph>=0.2",
     "chromadb>=0.5",
     "sentence-transformers>=3.0",
+    "sse-starlette>=3.4.11",
 ]
 
 [dependency-groups]

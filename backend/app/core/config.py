@@ -22,11 +22,14 @@ class Settings(BaseSettings):
     allowed_extensions: set[str] = {".pdf", ".docx", ".txt", ".md"}
 
     # Chunking (FR-4).
-    chunk_size: int = 5000
-    chunk_overlap: int = 150
-
+    chunk_size: int = 800
+    chunk_overlap: int = 120
+    
     # Embedding & indexing (FR-5).
     embedding_model: str = "BAAI/bge-small-en-v1.5"
+
+    # Load the embedding weights during startup instead of on the first upload.
+    warm_embeddings_on_startup: bool = True
 
     # Question answering / RAG generation (FR-8 to FR-12).
     openai_api_key: str = ""

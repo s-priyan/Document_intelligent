@@ -5,13 +5,15 @@
  *
  * Holds the active conversation in memory: the ordered list of turns and the
  * backend-issued `session_id`, which doubles as the LangGraph `thread_id`. The
- * session id is assigned from the first response and reused for every follow-up
- * so the backend retains multi-turn context. No persistence / DB is used.
+ * session id is assigned from the stream's opening `session` event and reused
+ * for every follow-up so the backend retains multi-turn context. Answers are
+ * streamed in, so the pending turn is patched as tokens arrive. No persistence
+ * / DB is used.
  */
 
 import { useCallback, useRef, useState } from "react";
 
-import { ApiError, queryKnowledgeIndex } from "./api";
+import { ApiError, streamKnowledgeIndexQuery } from "./api";
 import type { ChatMessage } from "./types";
 
 /** Generate a stable client-side id for a rendered message. */
@@ -37,6 +39,17 @@ export function useChat(indexId: string): UseChatResult {
   const sessionIdRef = useRef<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  const patchMessage = useCallback(
+    (id: string, patch: Partial<ChatMessage>): void => {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === id ? { ...message, ...patch } : message,
+        ),
+      );
+    },
+    [],
+  );
+
   const sendMessage = useCallback(
     async (question: string): Promise<void> => {
       const trimmed = question.trim();
@@ -61,42 +74,36 @@ export function useChat(indexId: string): UseChatResult {
       setIsSending(true);
 
       try {
-        const response = await queryKnowledgeIndex(
-          indexId,
-          trimmed,
-          sessionIdRef.current,
-        );
-        sessionIdRef.current = response.session_id;
-        setSessionId(response.session_id);
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === pendingId
-              ? {
-                  ...message,
-                  content: response.answer,
-                  citations: response.citations,
-                  pending: false,
-                }
-              : message,
-          ),
-        );
+        let streamed = "";
+        await streamKnowledgeIndexQuery(indexId, trimmed, sessionIdRef.current, {
+          onSession: (id) => {
+            sessionIdRef.current = id;
+            setSessionId(id);
+          },
+          onCitations: (citations) => patchMessage(pendingId, { citations }),
+          onDelta: (text) => {
+            streamed += text;
+            patchMessage(pendingId, { content: streamed });
+          },
+          onDone: (answer) =>
+            patchMessage(pendingId, { content: answer, pending: false }),
+        });
       } catch (error) {
         const detail =
           error instanceof ApiError
             ? error.message
             : "Something went wrong while answering.";
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === pendingId
-              ? { ...message, content: detail, pending: false, error: true }
-              : message,
-          ),
-        );
+        patchMessage(pendingId, {
+          content: detail,
+          citations: undefined,
+          pending: false,
+          error: true,
+        });
       } finally {
         setIsSending(false);
       }
     },
-    [indexId, isSending],
+    [indexId, isSending, patchMessage],
   );
 
   const clearConversation = useCallback((): void => {
