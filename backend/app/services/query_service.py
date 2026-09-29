@@ -14,6 +14,7 @@ from app.schemas.query import (
     SessionEvent,
 )
 from app.services.knowledge_index_service import KnowledgeIndexService
+from app.services.speech_stream import SpokenAnswerStream
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,15 @@ logger = logging.getLogger(__name__)
 class QueryService:
     """Validate the target index, run the RAG graph, and shape the response."""
 
-    def __init__(self, index_service: KnowledgeIndexService, qa_graph: QaGraph) -> None:
+    def __init__(
+        self,
+        index_service: KnowledgeIndexService,
+        qa_graph: QaGraph,
+        spoken_stream: SpokenAnswerStream | None = None,
+    ) -> None:
         self._index_service = index_service
         self._qa_graph = qa_graph
+        self._spoken_stream = spoken_stream
 
     def answer(self, index_id: str, question: str, session_id: str | None) -> QueryResponse:
         """Answer ``question`` against ``index_id`` within a conversation session.
@@ -59,24 +66,32 @@ class QueryService:
         return QueryResponse(answer=answer, citations=citations, session_id=thread_id)
 
     def stream_answer(
-        self, index_id: str, question: str, session_id: str | None
+        self, index_id: str, question: str, session_id: str | None, speak: bool = False
     ) -> AsyncIterator[QueryStreamEvent]:
         """Answer ``question`` as a stream of events for server-sent delivery.
 
         The index is validated eagerly so a missing index still surfaces as a
         regular HTTP error, before any event has been written to the response.
 
+        :param speak: Also emit an audio event per sentence; ignored when no
+            speech engine is configured.
         :raises IndexNotFoundError: if the knowledge index does not exist.
         """
         self._index_service.ensure_exists(index_id)
         thread_id = session_id or uuid.uuid4().hex
         logger.info(
-            "Query stream started | index=%s session=%s question=%r",
+            "Query stream started | index=%s session=%s speak=%s question=%r",
             index_id,
             thread_id,
+            speak,
             question,
         )
-        return self._stream_events(index_id, question, thread_id)
+        events = self._stream_events(index_id, question, thread_id)
+        if speak and self._spoken_stream is not None:
+            return self._spoken_stream.stream(events)
+        # Unrequested or unconfigured speech leaves the text stream untouched.
+
+        return events
 
     async def _stream_events(
         self, index_id: str, question: str, thread_id: str

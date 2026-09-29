@@ -22,6 +22,7 @@ from app.schemas.query import (
 )
 from app.services.knowledge_index_service import KnowledgeIndexService
 from app.services.query_service import QueryService
+from app.services.speech_stream import SpokenAnswerStream
 from app.services.storage import StorageService
 
 
@@ -73,6 +74,30 @@ class FakeQaGraph:
         yield DoneEvent(answer="".join(self.deltas))
 
 
+class FakeSpeechSynthesizer:
+    """Stand-in for the Gemini speech engine (no network, no audio codecs).
+
+    Records every sentence it was asked to voice; setting ``failure`` makes it
+    blow up so tests can prove a speech outage leaves the answer intact.
+    """
+
+    def __init__(self) -> None:
+        self.spoken: list[str] = []
+        self.failure: Exception | None = None
+
+    def synthesize(self, text: str) -> bytes:
+        self.spoken.append(text)
+        if self.failure is not None:
+            raise self.failure
+        return f"wav:{text}".encode()
+
+
+@pytest.fixture
+def synthesizer() -> FakeSpeechSynthesizer:
+    """Expose the fake speech engine so tests can assert what was spoken."""
+    return FakeSpeechSynthesizer()
+
+
 @pytest.fixture
 def vector_store() -> FakeVectorStore:
     """Expose the fake vector store so tests can assert what was indexed."""
@@ -87,7 +112,11 @@ def qa_graph() -> FakeQaGraph:
 
 @pytest.fixture
 def client(
-    tmp_path, monkeypatch, vector_store: FakeVectorStore, qa_graph: FakeQaGraph
+    tmp_path,
+    monkeypatch,
+    vector_store: FakeVectorStore,
+    qa_graph: FakeQaGraph,
+    synthesizer: FakeSpeechSynthesizer,
 ) -> Iterator[TestClient]:
     """Provide a TestClient backed by services pointed at a temp storage dir."""
     settings = Settings(storage_dir=tmp_path / "storage")
@@ -107,7 +136,7 @@ def client(
     app.dependency_overrides[deps.get_document_parser] = lambda: DocumentParser()
     app.dependency_overrides[deps.get_document_indexer] = lambda: indexer
     app.dependency_overrides[deps.get_query_service] = lambda: QueryService(
-        index_service, qa_graph
+        index_service, qa_graph, SpokenAnswerStream(synthesizer)
     )
 
     with TestClient(app) as test_client:

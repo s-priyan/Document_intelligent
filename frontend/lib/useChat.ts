@@ -11,9 +11,10 @@
  * / DB is used.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, streamKnowledgeIndexQuery } from "./api";
+import { AudioQueuePlayer } from "./audioQueue";
 import type { ChatMessage } from "./types";
 
 /** Generate a stable client-side id for a rendered message. */
@@ -30,14 +31,48 @@ export interface UseChatResult {
   sessionId: string | null;
   sendMessage: (question: string) => Promise<void>;
   clearConversation: () => void;
+  /** True while a spoken answer is being played back. */
+  isSpeaking: boolean;
+  stopSpeaking: () => void;
 }
 
-/** Manage the chat thread and session lifecycle for a single knowledge index. */
-export function useChat(indexId: string): UseChatResult {
+/**
+ * Manage the chat thread and session lifecycle for a single knowledge index.
+ *
+ * With `speak` set, the answer is also requested as audio and played back as it
+ * arrives at `speechRate`; toggling it off mid-answer only affects the next
+ * question, so {@link UseChatResult.stopSpeaking} exists to cut the current one
+ * short.
+ */
+export function useChat(indexId: string, speak = false, speechRate = 1): UseChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const playerRef = useRef<AudioQueuePlayer | null>(null);
+  const rateRef = useRef(speechRate);
+
+  const player = useCallback((): AudioQueuePlayer => {
+    if (playerRef.current === null) {
+      playerRef.current = new AudioQueuePlayer(setIsSpeaking);
+      playerRef.current.setRate(rateRef.current);
+      // The player is built on the first spoken answer, by which point the
+      // speed may already have been changed.
+    }
+    return playerRef.current;
+  }, []);
+
+  useEffect(() => {
+    rateRef.current = speechRate;
+    playerRef.current?.setRate(speechRate);
+  }, [speechRate]);
+
+  const stopSpeaking = useCallback((): void => {
+    playerRef.current?.stop();
+  }, []);
+
+  useEffect(() => () => playerRef.current?.dispose(), []);
 
   const patchMessage = useCallback(
     (id: string, patch: Partial<ChatMessage>): void => {
@@ -72,10 +107,12 @@ export function useChat(indexId: string): UseChatResult {
       };
       setMessages((prev) => [...prev, userMessage, pendingMessage]);
       setIsSending(true);
+      stopSpeaking();
+      // A new question supersedes whatever is still being read out.
 
       try {
         let streamed = "";
-        await streamKnowledgeIndexQuery(indexId, trimmed, sessionIdRef.current, {
+        await streamKnowledgeIndexQuery(indexId, trimmed, sessionIdRef.current, speak, {
           onSession: (id) => {
             sessionIdRef.current = id;
             setSessionId(id);
@@ -87,6 +124,7 @@ export function useChat(indexId: string): UseChatResult {
           },
           onDone: (answer) =>
             patchMessage(pendingId, { content: answer, pending: false }),
+          onAudio: (audio) => player().enqueue(audio.audio_base64),
         });
       } catch (error) {
         const detail =
@@ -103,14 +141,23 @@ export function useChat(indexId: string): UseChatResult {
         setIsSending(false);
       }
     },
-    [indexId, isSending, patchMessage],
+    [indexId, isSending, patchMessage, player, speak, stopSpeaking],
   );
 
   const clearConversation = useCallback((): void => {
+    stopSpeaking();
     sessionIdRef.current = null;
     setSessionId(null);
     setMessages([]);
-  }, []);
+  }, [stopSpeaking]);
 
-  return { messages, isSending, sessionId, sendMessage, clearConversation };
+  return {
+    messages,
+    isSending,
+    sessionId,
+    sendMessage,
+    clearConversation,
+    isSpeaking,
+    stopSpeaking,
+  };
 }

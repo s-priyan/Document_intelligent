@@ -22,6 +22,10 @@ class QueryRequest(BaseModel):
         default=None,
         description="Conversation id to continue a multi-turn session; omit to start a new one.",
     )
+    speak: bool = Field(
+        default=False,
+        description="Stream spoken audio alongside the answer text (streaming endpoint only).",
+    )
 
 
 class QueryResponse(BaseModel):
@@ -64,6 +68,21 @@ class DeltaEvent(QueryStreamEvent):
     event: ClassVar[str] = "delta"
 
     text: str
+
+
+class AudioEvent(QueryStreamEvent):
+    """Spoken audio for one sentence of the answer, sent as the answer streams.
+
+    Emitted only when the caller asked for speech. Audio trails the text it
+    belongs to, so these are interleaved with (and may follow) the deltas.
+    """
+
+    event: ClassVar[str] = "audio"
+
+    sequence: int
+    text: str
+    mime_type: str = "audio/wav"
+    audio_base64: str
 
 
 class DoneEvent(QueryStreamEvent):

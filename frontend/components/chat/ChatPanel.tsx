@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getKnowledgeIndex } from "@/lib/api";
 import { useChat } from "@/lib/useChat";
 import { useIngestion, startIngestion } from "@/lib/ingestion";
+import { useVoicePreference } from "@/lib/useVoicePreference";
 import { STARTER_QUESTIONS } from "@/lib/starters";
 import { validateFile } from "@/lib/validation";
 import { UploadDropzone } from "@/components/documents/UploadDropzone";
@@ -11,6 +12,7 @@ import type { Citation, KnowledgeIndex } from "@/lib/types";
 import { ChatInputBar } from "./ChatInputBar";
 import { MessageThread } from "./MessageThread";
 import { CitationPanel } from "./CitationPanel";
+import { VoiceToggle } from "./VoiceToggle";
 
 export function ChatPanel({ indexId, initialQuestion = "" }: { indexId: string; initialQuestion?: string }) {
   const [index, setIndex] = useState<KnowledgeIndex | null>(null);
@@ -19,7 +21,8 @@ export function ChatPanel({ indexId, initialQuestion = "" }: { indexId: string; 
   const [selection, setSelection] = useState<{ citations: Citation[]; position: number } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const job = useIngestion(indexId);
-  const { messages, isSending, sendMessage, clearConversation } = useChat(indexId);
+  const { voiceEnabled, setVoiceEnabled, voiceAvailable, speak, speechRate, cycleSpeechRate } = useVoicePreference();
+  const { messages, isSending, sendMessage, clearConversation, isSpeaking, stopSpeaking } = useChat(indexId, speak, speechRate);
   useEffect(() => {
     let active = true;
     setError(null);
@@ -35,7 +38,7 @@ export function ChatPanel({ indexId, initialQuestion = "" }: { indexId: string; 
   const ready = !!index && !error && !job?.pending && index.document_count > 0;
   return <div className="relative flex h-dvh w-full overflow-hidden bg-canvas-raised">
     <div className={`flex min-w-0 flex-1 flex-col ${selection ? "hidden md:flex" : ""}`}>
-      <header className="flex items-center gap-3 border-b border-line px-4 py-4 sm:px-6"><Link href="/" aria-label="Back to knowledge library" className="btn-ghost px-3">←</Link><Link href={`/indexes/${encodeURIComponent(indexId)}`} className="min-w-0 flex-1"><h1 className="truncate text-sm font-semibold">{index?.name ?? "Knowledge index"} <span className="text-ink-muted">⌄</span></h1><p className="mt-1 text-xs text-ink-muted">{index ? `${index.document_count} documents` : "Loading…"}</p></Link><button onClick={() => { clearConversation(); setSelection(null); }} disabled={isSending || !messages.length} className="btn-ghost px-3" aria-label="Start new chat">+ <span className="hidden sm:inline">New chat</span></button></header>
+      <header className="flex items-center gap-3 border-b border-line px-4 py-4 sm:px-6"><Link href="/" aria-label="Back to knowledge library" className="btn-ghost px-3">←</Link><Link href={`/indexes/${encodeURIComponent(indexId)}`} className="min-w-0 flex-1"><h1 className="truncate text-sm font-semibold">{index?.name ?? "Knowledge index"} <span className="text-ink-muted">⌄</span></h1><p className="mt-1 text-xs text-ink-muted">{index ? `${index.document_count} documents` : "Loading…"}</p></Link><VoiceToggle enabled={voiceEnabled} available={voiceAvailable} speaking={isSpeaking} speechRate={speechRate} onChange={setVoiceEnabled} onStop={stopSpeaking} onCycleRate={cycleSpeechRate} /><button onClick={() => { clearConversation(); setSelection(null); }} disabled={isSending || !messages.length} className="btn-ghost px-3" aria-label="Start new chat">+ <span className="hidden sm:inline">New chat</span></button></header>
       {error && <div role="alert" className="p-4 text-sm text-danger">{error}<button className="btn-ghost ml-2" onClick={() => setReload((value) => value + 1)}>Retry</button></div>}
       {job?.pending && <p role="status" className="border-b border-line bg-accent-faint p-4 text-sm text-accent-soft">Indexing your documents… You can ask questions when they are ready. Keep this tab open.</p>}
       {job?.error && <p role="alert" className="p-4 text-sm text-danger">{job.error} Add your files again to retry.</p>}

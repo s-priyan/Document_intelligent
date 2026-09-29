@@ -14,7 +14,9 @@ from app.rag.qa_graph import QaGraph
 from app.rag.vector_store import VectorStoreService
 from app.services.knowledge_index_service import KnowledgeIndexService
 from app.services.query_service import QueryService
+from app.services.speech_stream import SpokenAnswerStream
 from app.services.storage import StorageService
+from app.tts.synthesizer import SpeechSynthesizer
 
 
 @lru_cache
@@ -81,6 +83,32 @@ def get_qa_graph() -> QaGraph:
 
 
 @lru_cache
+def get_speech_synthesizer() -> SpeechSynthesizer | None:
+    """Provide a singleton :class:`SpeechSynthesizer`, or ``None`` if unconfigured.
+
+    Spoken answers are an opt-in extra, so a deployment without a Gemini API
+    key simply serves text instead of failing to start.
+    """
+    settings = get_settings()
+    if not settings.tts_enabled:
+        return None
+
+    return SpeechSynthesizer(settings)
+
+
+@lru_cache
+def get_spoken_answer_stream() -> SpokenAnswerStream | None:
+    """Provide a singleton :class:`SpokenAnswerStream`, or ``None`` if unconfigured."""
+    synthesizer = get_speech_synthesizer()
+    if synthesizer is None:
+        return None
+
+    return SpokenAnswerStream(synthesizer)
+
+
+@lru_cache
 def get_query_service() -> QueryService:
     """Provide a singleton :class:`QueryService` (FR-8)."""
-    return QueryService(get_knowledge_index_service(), get_qa_graph())
+    return QueryService(
+        get_knowledge_index_service(), get_qa_graph(), get_spoken_answer_stream()
+    )

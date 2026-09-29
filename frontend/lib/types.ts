@@ -40,6 +40,21 @@ export interface Citation {
 export interface QueryRequest {
   question: string;
   session_id?: string | null;
+  speak?: boolean;
+}
+
+/** Service health, including which optional features the backend offers. */
+export interface HealthStatus {
+  status: string;
+  tts_enabled: boolean;
+}
+
+/** Spoken audio for one sentence of a streamed answer. */
+export interface AudioChunk {
+  sequence: number;
+  text: string;
+  mime_type: string;
+  audio_base64: string;
 }
 
 export interface QueryResponse {

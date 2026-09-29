@@ -39,8 +39,12 @@ def stream_knowledge_index_query(
     Emits ``session``, then ``citations``, then a ``delta`` per answer token,
     and finally ``done`` with the complete answer. A failure after the stream
     has opened arrives as a terminal ``error`` event instead of ``done``.
+    Setting ``speak`` interleaves an ``audio`` event per spoken sentence, which
+    lags the text and may therefore continue past ``done``.
     """
-    events = service.stream_answer(index_id, payload.question, payload.session_id)
+    events = service.stream_answer(
+        index_id, payload.question, payload.session_id, payload.speak
+    )
     return EventSourceResponse(_as_server_sent_events(events))
 
 

@@ -8,8 +8,10 @@
 
 import { API_BASE_URL } from "./config";
 import type {
+  AudioChunk,
   BulkUploadResponse,
   Citation,
+  HealthStatus,
   KnowledgeIndex,
   QueryResponse,
 } from "./types";
@@ -60,6 +62,11 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(await extractErrorMessage(response), response.status);
   }
   return (await response.json()) as T;
+}
+
+/** Report service health and which optional features are configured (FR-21). */
+export function getHealth(): Promise<HealthStatus> {
+  return requestJson<HealthStatus>("/health");
 }
 
 /** Create a new, named knowledge index (FR-19). */
@@ -124,6 +131,7 @@ export interface QueryStreamHandlers {
   onCitations?: (citations: Citation[]) => void;
   onDelta?: (text: string) => void;
   onDone?: (answer: string) => void;
+  onAudio?: (audio: AudioChunk) => void;
 }
 
 /**
@@ -133,11 +141,15 @@ export interface QueryStreamHandlers {
  * off `fetch` manually. Resolves once the terminal `done` event arrives; a
  * transport failure, a non-2xx status or a terminal `error` event all surface as
  * a thrown {@link ApiError}.
+ *
+ * With `speak` set, the backend also emits an audio chunk per sentence. Speech
+ * lags the text it belongs to, so `onAudio` can fire after `onDone`.
  */
 export async function streamKnowledgeIndexQuery(
   indexId: string,
   question: string,
   sessionId: string | null,
+  speak: boolean,
   handlers: QueryStreamHandlers,
 ): Promise<void> {
   let response: Response;
@@ -150,7 +162,7 @@ export async function streamKnowledgeIndexQuery(
           "Content-Type": "application/json",
           Accept: "text/event-stream",
         },
-        body: JSON.stringify({ question, session_id: sessionId }),
+        body: JSON.stringify({ question, session_id: sessionId, speak }),
       },
     );
   } catch {
@@ -214,6 +226,9 @@ function dispatchStreamFrame(frame: string, handlers: QueryStreamHandlers): void
       return;
     case "done":
       handlers.onDone?.(payload.answer as string);
+      return;
+    case "audio":
+      handlers.onAudio?.(payload as AudioChunk);
       return;
     case "error":
       // An in-band failure has no HTTP status of its own; 0 matches the

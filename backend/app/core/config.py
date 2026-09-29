@@ -36,12 +36,22 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.5"
     retrieval_k: int = 4
 
+    # Spoken answers (text-to-speech), served by Gemini.
+    google_api_key: str = ""
+    tts_model: str = "gemini-2.5-flash-preview-tts"
+    tts_voice: str = "Kore"
+
     cors_origins: list[str] = ["http://localhost:3000","http://localhost:3001","http://localhost:3002"]
 
     @property
     def max_file_size_bytes(self) -> int:
         """Maximum allowed upload size expressed in bytes."""
         return self.max_file_size_mb * 1024 * 1024
+
+    @property
+    def tts_enabled(self) -> bool:
+        """Whether answers can be spoken; requires a Gemini API key."""
+        return bool(self.google_api_key)
 
 
 @lru_cache

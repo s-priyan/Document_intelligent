@@ -4,6 +4,7 @@ A scripted :class:`~tests.conftest.FakeQaGraph` stands in for the LangGraph
 pipeline so the retrieval and LLM backends are never touched.
 """
 
+import base64
 import json
 
 from app.core.exceptions import QueryError
@@ -94,6 +95,36 @@ def test_query_stream_reports_mid_stream_failure_as_an_error_event(client, qa_gr
     events = parse_sse(response.text)
     assert [name for name, _ in events] == ["session", "citations", "error"]
     assert events[-1][1]["detail"] == "backend exploded"
+
+
+def test_query_stream_speaks_the_answer_when_asked(client, synthesizer) -> None:
+    create_index(client)
+
+    response = client.post(STREAM_URL, json={"question": "hi?", "speak": True})
+
+    assert response.status_code == 200
+    events = parse_sse(response.text)
+    assert [name for name, _ in events if name != "audio"] == [
+        "session",
+        "citations",
+        "delta",
+        "delta",
+        "done",
+    ]
+
+    audio = [payload for name, payload in events if name == "audio"]
+    assert [payload["text"] for payload in audio] == ["Hello world"]
+    assert base64.b64decode(audio[0]["audio_base64"]) == b"wav:Hello world"
+    assert synthesizer.spoken == ["Hello world"]
+
+
+def test_query_stream_stays_silent_unless_speech_is_requested(client, synthesizer) -> None:
+    create_index(client)
+
+    response = client.post(STREAM_URL, json={"question": "hi?"})
+
+    assert [name for name, _ in parse_sse(response.text) if name == "audio"] == []
+    assert synthesizer.spoken == []
 
 
 def test_query_rejects_an_empty_question(client) -> None:

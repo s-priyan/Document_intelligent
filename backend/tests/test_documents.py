@@ -12,7 +12,11 @@ from app.rag.chunking import DocumentChunker
 def test_health(client) -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    # Whether speech is configured depends on the environment, only its presence
+    # is part of the contract.
+    assert isinstance(body["tts_enabled"], bool)
 
 
 def test_create_and_list_index(client) -> None:
